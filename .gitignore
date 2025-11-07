@@ -1,3 +1,6 @@
 # Ignore output and samples directories
 samples/
 output/
+
+# Ignore Python cache directories
+__pycache__/

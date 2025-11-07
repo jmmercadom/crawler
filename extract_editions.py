@@ -1,148 +1,125 @@
 #!/usr/bin/env python3
 """
-Extract edition data from the Gaceta Oficial HTML index.
+CLI for extracting edition data from the Gaceta Oficial HTML index.
+
+This module provides the command-line interface for the edition extraction service.
 """
 
 import argparse
 import json
 import os
-import re
-from html.parser import HTMLParser
-from datetime import datetime
+import sys
+from typing import Optional
+
+from edition_core import EditionExtractionService
 
 
-class EditionExtractor(HTMLParser):
-    """Extract edition information from HTML."""
+class EditionCLI:
+    """Command-line interface for edition extraction."""
 
     def __init__(self):
-        super().__init__()
-        self.editions = []
-        self.current_edition = None
-        self.in_anuncio = False
-        self.capture_text = False
-        self.text_buffer = []
+        self.service = EditionExtractionService()
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    def handle_starttag(self, tag, attrs):
-        attrs_dict = dict(attrs)
-
-        # Look for the anuncio div that contains edition details
-        if tag == "div" and attrs_dict.get("class") == "anuncio":
-            self.in_anuncio = True
-            self.current_edition = {
-                "number": None,
-                "type": None,
-                "published_date": None,
-                "administration": None,
-            }
-            self.text_buffer = []
-
-    def handle_endtag(self, tag):
-        if tag == "div" and self.in_anuncio:
-            # Process the collected text
-            text = "".join(self.text_buffer)
-            self._parse_edition_text(text)
-
-            # Only add if we have at least a number
-            if self.current_edition and self.current_edition["number"]:
-                self.editions.append(self.current_edition)
-
-            self.in_anuncio = False
-            self.current_edition = None
-            self.text_buffer = []
-
-    def handle_data(self, data):
-        if self.in_anuncio:
-            self.text_buffer.append(data)
-
-    def _parse_edition_text(self, text):
-        """Parse the edition text and extract fields."""
-        if not self.current_edition:
-            return
-
-        # Extract edition number
-        number_match = re.search(r"Nº de Edición\s*:\s*(\S+)", text)
-        if number_match:
-            self.current_edition["number"] = number_match.group(1).strip()
-
-        # Extract edition type
-        type_match = re.search(
-            r"Tipo de Edición\s*:\s*([^\n]+?)(?:\s*Fecha|\s*$)", text, re.DOTALL
+    def setup_argument_parser(self) -> argparse.ArgumentParser:
+        """Configure and return the argument parser."""
+        parser = argparse.ArgumentParser(
+            description="Extract edition data from Gaceta Oficial HTML index."
         )
-        if type_match:
-            self.current_edition["type"] = type_match.group(1).strip()
+        parser.add_argument(
+            "-in",
+            "--input-file",
+            dest="input_file",
+            help="Path to the input HTML file, relative to the script's directory",
+            required=True,
+        )
+        parser.add_argument(
+            "-out",
+            "--output-file",
+            dest="output_file",
+            help="Path to the output JSON file (default: output/<input_filename>-editions.json)",
+        )
+        return parser
 
-        # Extract publication date and convert to ISO 8601
-        date_match = re.search(r"Fecha de Publicación\s*:\s*(\d{2}-\d{2}-\d{4})", text)
-        if date_match:
-            date_str = date_match.group(1).strip()
-            try:
-                # Convert from DD-MM-YYYY to YYYY-MM-DD
-                date_obj = datetime.strptime(date_str, "%d-%m-%Y")
-                self.current_edition["published_date"] = date_obj.strftime("%Y-%m-%d")
-            except ValueError:
-                self.current_edition["published_date"] = None
+    def resolve_output_path(self, input_file: str, output_file: Optional[str]) -> str:
+        """
+        Determine the output file path.
 
-        # Extract administration/government
-        admin_match = re.search(r"Gobierno\s*:\s*([^\n<]+)", text)
-        if admin_match:
-            self.current_edition["administration"] = admin_match.group(1).strip()
+        Args:
+            input_file: The input file path
+            output_file: Optional explicit output file path
 
+        Returns:
+            The resolved output file path
+        """
+        if output_file:
+            return output_file
 
-def extract_editions(html_file_path, output_file_path):
-    """Extract editions from HTML and save to JSON."""
-
-    # Read the HTML file
-    with open(html_file_path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-
-    # Parse and extract
-    parser = EditionExtractor()
-    parser.feed(html_content)
-
-    # Save to JSON
-    with open(output_file_path, "w", encoding="utf-8") as f:
-        json.dump(parser.editions, f, ensure_ascii=False, indent=2)
-
-    return len(parser.editions)
-
-
-if __name__ == "__main__":
-    # Get the script's directory (project root)
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # Set up argument parser
-    parser = argparse.ArgumentParser(
-        description="Extract edition data from Gaceta Oficial HTML index."
-    )
-    parser.add_argument(
-        "-in", "--input-file",
-        dest="input_file",
-        help="Path to the input HTML file, relative to the script's directory",
-        required=True
-    )
-    parser.add_argument(
-        "-out", "--output-file",
-        dest="output_file",
-        help="Path to the output JSON file (default: output/<input_filename>-editions.json)"
-    )
-
-    args = parser.parse_args()
-
-    # Determine output file path
-    if args.output_file:
-        output_file = args.output_file
-    else:
         # Create output filename from input filename
-        input_basename = os.path.basename(args.input_file)
+        input_basename = os.path.basename(input_file)
         input_name, _ = os.path.splitext(input_basename)
         output_filename = f"{input_name}-editions.json"
-        output_dir = os.path.join(script_dir, "output")
+        output_dir = os.path.join(self.script_dir, "output")
 
         # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
 
-        output_file = os.path.join(output_dir, output_filename)
+        return os.path.join(output_dir, output_filename)
 
-    # Extract editions
-    count = extract_editions(args.input_file, output_file)
-    print(f"Extracted {count} editions to {output_file}")
+    def save_editions_to_json(self, editions, output_path: str) -> None:
+        """
+        Save editions to a JSON file.
+
+        Args:
+            editions: List of Edition objects
+            output_path: Path to save the JSON file
+        """
+        editions_data = [edition.to_dict() for edition in editions]
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(editions_data, f, ensure_ascii=False, indent=2)
+
+    def run(self, args=None) -> int:
+        """
+        Run the CLI application.
+
+        Args:
+            args: Optional arguments list (defaults to sys.argv)
+
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        parser = self.setup_argument_parser()
+        parsed_args = parser.parse_args(args)
+
+        try:
+            # Extract editions using the service
+            editions = self.service.extract_from_file(parsed_args.input_file)
+
+            # Resolve output path
+            output_path = self.resolve_output_path(
+                parsed_args.input_file, parsed_args.output_file
+            )
+
+            # Save to JSON
+            self.save_editions_to_json(editions, output_path)
+
+            # Report success
+            print(f"Extracted {len(editions)} editions to {output_path}")
+            return 0
+
+        except FileNotFoundError:
+            print(f"Error: Input file '{parsed_args.input_file}' not found", file=sys.stderr)
+            return 1
+        except Exception as e:
+            print(f"Error: {str(e)}", file=sys.stderr)
+            return 1
+
+
+def main():
+    """Main entry point for the CLI."""
+    cli = EditionCLI()
+    sys.exit(cli.run())
+
+
+if __name__ == "__main__":
+    main()
