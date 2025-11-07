@@ -1,0 +1,12 @@
+[project]
+name = "gaceta-oficial-crawler"
+version = "0.1.0"
+description = "Extract edition data from Gaceta Oficial HTML index files and output as JSON"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "coloredlogs>=15.0.1",
+]
+
+[project.scripts]
+extract-editions = "extract_editions:main"

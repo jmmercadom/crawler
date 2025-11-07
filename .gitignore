@@ -4,3 +4,17 @@ output/
 
 # Ignore Python cache directories
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# uv
+.uv/
+uv.lock
