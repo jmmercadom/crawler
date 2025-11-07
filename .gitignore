@@ -1,0 +1,3 @@
+# Ignore output and samples directories
+samples/
+output/
