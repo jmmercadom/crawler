@@ -9,9 +9,13 @@ import argparse
 import json
 import os
 import sys
+import logging
 from typing import Optional
 
 from edition_core import EditionExtractionService
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 class EditionCLI:
@@ -53,6 +57,7 @@ class EditionCLI:
             The resolved output file path
         """
         if output_file:
+            logger.debug("Using explicit output file: %s", output_file)
             return output_file
 
         # Create output filename from input filename
@@ -63,8 +68,11 @@ class EditionCLI:
 
         # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
+        logger.debug("Created/verified output directory: %s", output_dir)
 
-        return os.path.join(output_dir, output_filename)
+        output_path = os.path.join(output_dir, output_filename)
+        logger.debug("Resolved output path: %s", output_path)
+        return output_path
 
     def save_editions_to_json(self, editions, output_path: str) -> None:
         """
@@ -74,9 +82,12 @@ class EditionCLI:
             editions: List of Edition objects
             output_path: Path to save the JSON file
         """
+        logger.debug("Converting %d editions to JSON format", len(editions))
         editions_data = [edition.to_dict() for edition in editions]
+        logger.debug("Writing JSON to file: %s", output_path)
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(editions_data, f, ensure_ascii=False, indent=2)
+        logger.debug("Successfully wrote JSON file")
 
     def run(self, args=None) -> int:
         """
@@ -91,6 +102,9 @@ class EditionCLI:
         parser = self.setup_argument_parser()
         parsed_args = parser.parse_args(args)
 
+        logger.debug("CLI arguments: input_file=%s, output_file=%s",
+                    parsed_args.input_file, parsed_args.output_file)
+
         try:
             # Extract editions using the service
             editions = self.service.extract_from_file(parsed_args.input_file)
@@ -104,19 +118,63 @@ class EditionCLI:
             self.save_editions_to_json(editions, output_path)
 
             # Report success
-            print(f"Extracted {len(editions)} editions to {output_path}")
+            logger.info("Extracted %d editions to %s", len(editions), output_path)
             return 0
 
         except FileNotFoundError:
-            print(f"Error: Input file '{parsed_args.input_file}' not found", file=sys.stderr)
+            logger.error("Input file '%s' not found", parsed_args.input_file)
             return 1
         except Exception as e:
-            print(f"Error: {str(e)}", file=sys.stderr)
+            logger.error("Unexpected error: %s", str(e))
             return 1
+
+
+def get_log_level() -> int:
+    """
+    Get the logging level from the LOG_LEVEL environment variable.
+
+    Returns:
+        The logging level (defaults to logging.INFO if not set or invalid)
+    """
+    level_name = os.getenv('LOG_LEVEL', 'INFO').upper()
+    level_map = {
+        'DEBUG': logging.DEBUG,
+        'INFO': logging.INFO,
+        'WARNING': logging.WARNING,
+        'ERROR': logging.ERROR,
+        'CRITICAL': logging.CRITICAL,
+    }
+    return level_map.get(level_name, logging.INFO)
 
 
 def main():
     """Main entry point for the CLI."""
+    # Get log level from environment variable
+    log_level = get_log_level()
+
+    # Setup colored logging
+    try:
+        import coloredlogs
+        coloredlogs.install(
+            level=log_level,
+            fmt='%(asctime)s %(name)s %(levelname)s %(message)s',
+            level_styles={
+                'debug': {'color': 'cyan'},
+                'info': {'color': 'green'},
+                'warning': {'color': 'yellow'},
+                'error': {'color': 'red'},
+                'critical': {'color': 'red', 'bold': True},
+            }
+        )
+    except ImportError:
+        # Fallback to basic logging if coloredlogs not installed
+        logging.basicConfig(
+            level=log_level,
+            format='%(asctime)s %(name)s %(levelname)s %(message)s'
+        )
+        logger.warning("coloredlogs not installed, using basic logging")
+
+    logger.info("log level: %s", log_level)
     cli = EditionCLI()
     sys.exit(cli.run())
 

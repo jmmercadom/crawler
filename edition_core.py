@@ -6,9 +6,13 @@ edition information from Gaceta Oficial HTML files.
 """
 
 import re
+import logging
 from html.parser import HTMLParser
 from datetime import datetime
 from typing import List, Dict, Optional
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 class Edition:
@@ -55,6 +59,7 @@ class EditionExtractor(HTMLParser):
         # Look for the anuncio div that contains edition details
         if tag == "div" and attrs_dict.get("class") == "anuncio":
             # Start processing the edition
+            logger.debug("Found anuncio div, starting new edition extraction")
             self.in_anuncio = True
             self.current_edition = Edition()
             self.text_buffer = []
@@ -63,13 +68,15 @@ class EditionExtractor(HTMLParser):
         if tag == "div" and self.in_anuncio:
             # Process the collected text
             text = "".join(self.text_buffer)
+            logger.debug("Processing edition text block (length: %d chars)", len(text))
             self._parse_edition_text(text)
 
             # Only add if we have at least a number
             if self.current_edition and self.current_edition.number:
+                logger.debug("Successfully extracted edition: %s", self.current_edition)
                 self.editions.append(self.current_edition)
             else:
-                print(f"Warning: No edition number found in {text}")
+                logger.warning("No edition number found in text")
 
             # Reset the parser state
             self.in_anuncio = False
@@ -85,12 +92,15 @@ class EditionExtractor(HTMLParser):
         if not self.current_edition:
             return
 
+        logger.debug("Parsing edition text with regex patterns")
+
         # Extract edition number
         number_match = re.search(r"Nº de Edición\s*:\s*(\S+)", text)
         if number_match:
             self.current_edition.number = number_match.group(1).strip()
+            logger.debug("Extracted edition number: %s", self.current_edition.number)
         else:
-            print(f"Warning: No edition number found in {text}")
+            logger.warning("No edition number found in text")
 
         # Extract edition type
         type_match = re.search(
@@ -98,29 +108,33 @@ class EditionExtractor(HTMLParser):
         )
         if type_match:
             self.current_edition.type = type_match.group(1).strip()
+            logger.debug("Extracted edition type: %s", self.current_edition.type)
         else:
-            print(f"Warning: No edition type found in {text}")
+            logger.warning("No edition type found in text")
 
         # Extract publication date and convert to ISO 8601
         date_match = re.search(r"Fecha de Publicación\s*:\s*(\d{2}-\d{2}-\d{4})", text)
         if date_match:
             date_str = date_match.group(1).strip()
+            logger.debug("Found publication date: %s", date_str)
             try:
                 # Convert from DD-MM-YYYY to YYYY-MM-DD
                 date_obj = datetime.strptime(date_str, "%d-%m-%Y")
                 self.current_edition.published_date = date_obj.strftime("%Y-%m-%d")
+                logger.debug("Converted to ISO 8601: %s", self.current_edition.published_date)
             except ValueError:
-                print(f"Warning: Invalid publication date format in {text}")
+                logger.warning("Invalid publication date format: %s", date_str)
                 self.current_edition.published_date = None
         else:
-            print(f"Warning: No publication date found in {text}")
+            logger.warning("No publication date found in text")
 
         # Extract administration/government
         admin_match = re.search(r"Gobierno\s*:\s*([^\n<]+)", text)
         if admin_match:
             self.current_edition.administration = admin_match.group(1).strip()
+            logger.debug("Extracted administration: %s", self.current_edition.administration)
         else:
-            print(f"Warning: No administration/government found in {text}")
+            logger.warning("No administration/government found in text")
 
     def get_editions(self) -> List[Edition]:
         """Get the list of extracted editions."""
@@ -143,8 +157,11 @@ class EditionExtractionService:
         Returns:
             List of extracted Edition objects
         """
+        logger.debug("Starting HTML parsing (content length: %d chars)", len(html_content))
         self.extractor.feed(html_content)
-        return self.extractor.get_editions()
+        editions = self.extractor.get_editions()
+        logger.info("Extracted %d editions from HTML", len(editions))
+        return editions
 
     def extract_from_file(self, file_path: str) -> List[Edition]:
         """
@@ -160,8 +177,10 @@ class EditionExtractionService:
             FileNotFoundError: If the file doesn't exist
             IOError: If there's an error reading the file
         """
+        logger.debug("Reading HTML file: %s", file_path)
         with open(file_path, "r", encoding="utf-8") as f:
             html_content = f.read()
+        logger.debug("Successfully read file (size: %d bytes)", len(html_content))
 
         return self.extract_from_html(html_content)
 
