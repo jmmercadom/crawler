@@ -12,10 +12,20 @@ import sys
 import logging
 from typing import Optional
 
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+from opentelemetry.instrumentation.logging import LoggingInstrumentor
+
 from edition_core import EditionExtractionService
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
+
+# Get tracer for this module
+tracer = trace.get_tracer(__name__)
 
 
 class EditionCLI:
@@ -99,34 +109,57 @@ class EditionCLI:
         Returns:
             Exit code (0 for success, 1 for error)
         """
-        parser = self.setup_argument_parser()
-        parsed_args = parser.parse_args(args)
+        with tracer.start_as_current_span("extract_editions.run") as span:
+            parser = self.setup_argument_parser()
+            parsed_args = parser.parse_args(args)
 
-        logger.debug("CLI arguments: input_file=%s, output_file=%s",
-                    parsed_args.input_file, parsed_args.output_file)
+            logger.debug("CLI arguments: input_file=%s, output_file=%s",
+                        parsed_args.input_file, parsed_args.output_file)
 
-        try:
-            # Extract editions using the service
-            editions = self.service.extract_from_file(parsed_args.input_file)
+            # Add input file as span attribute
+            span.set_attribute("input.file", parsed_args.input_file)
+            if parsed_args.output_file:
+                span.set_attribute("output.file", parsed_args.output_file)
 
-            # Resolve output path
-            output_path = self.resolve_output_path(
-                parsed_args.input_file, parsed_args.output_file
-            )
+            try:
+                # Extract editions using the service
+                with tracer.start_as_current_span("extract_from_file") as extract_span:
+                    extract_span.set_attribute("file.path", parsed_args.input_file)
+                    editions = self.service.extract_from_file(parsed_args.input_file)
+                    extract_span.set_attribute("editions.count", len(editions))
 
-            # Save to JSON
-            self.save_editions_to_json(editions, output_path)
+                # Resolve output path
+                output_path = self.resolve_output_path(
+                    parsed_args.input_file, parsed_args.output_file
+                )
+                span.set_attribute("output.resolved_path", output_path)
 
-            # Report success
-            logger.info("Extracted %d editions to %s", len(editions), output_path)
-            return 0
+                # Save to JSON
+                with tracer.start_as_current_span("save_to_json") as save_span:
+                    save_span.set_attribute("output.path", output_path)
+                    save_span.set_attribute("editions.count", len(editions))
+                    self.save_editions_to_json(editions, output_path)
 
-        except FileNotFoundError:
-            logger.error("Input file '%s' not found", parsed_args.input_file)
-            return 1
-        except Exception as e:
-            logger.error("Unexpected error: %s", str(e))
-            return 1
+                # Report success
+                logger.info("Extracted %d editions to %s", len(editions), output_path)
+                span.set_attribute("success", True)
+                span.set_attribute("exit_code", 0)
+                return 0
+
+            except FileNotFoundError:
+                logger.error("Input file '%s' not found", parsed_args.input_file)
+                span.set_attribute("success", False)
+                span.set_attribute("error.type", "FileNotFoundError")
+                span.set_attribute("error.message", f"Input file '{parsed_args.input_file}' not found")
+                span.set_attribute("exit_code", 1)
+                return 1
+            except Exception as e:
+                logger.error("Unexpected error: %s", str(e))
+                span.set_attribute("success", False)
+                span.set_attribute("error.type", type(e).__name__)
+                span.set_attribute("error.message", str(e))
+                span.set_attribute("exit_code", 1)
+                return 1
 
 
 def get_log_level() -> int:
@@ -145,6 +178,53 @@ def get_log_level() -> int:
         'CRITICAL': logging.CRITICAL,
     }
     return level_map.get(level_name, logging.INFO)
+
+
+def setup_opentelemetry() -> None:
+    """
+    Initialize OpenTelemetry tracing.
+
+    Configuration is controlled by environment variables:
+    - OTEL_SERVICE_NAME: Service name (default: gaceta-crawler)
+    - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP endpoint (default: http://localhost:4318)
+    - OTEL_TRACES_ENABLED: Enable/disable tracing (default: true)
+    """
+    # Check if tracing is enabled
+    traces_enabled = os.getenv('OTEL_TRACES_ENABLED', 'true').lower() in ('true', '1', 'yes')
+    if not traces_enabled:
+        logger.info("OpenTelemetry tracing is disabled")
+        return
+
+    # Get service name from environment or use default
+    service_name = os.getenv('OTEL_SERVICE_NAME', 'gaceta-crawler')
+
+    # Create resource with service name
+    resource = Resource(attributes={
+        SERVICE_NAME: service_name
+    })
+
+    # Create tracer provider
+    provider = TracerProvider(resource=resource)
+
+    # Get OTLP endpoint from environment or use default
+    otlp_endpoint = os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://localhost:4318')
+
+    try:
+        # Create OTLP exporter
+        otlp_exporter = OTLPSpanExporter(endpoint=f"{otlp_endpoint}/v1/traces")
+
+        # Add batch span processor
+        provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+
+        # Set the tracer provider
+        trace.set_tracer_provider(provider)
+
+        # Instrument logging to correlate logs with traces
+        LoggingInstrumentor().instrument(set_logging_format=False)
+
+        logger.info("OpenTelemetry initialized: service=%s, endpoint=%s", service_name, otlp_endpoint)
+    except Exception as e:
+        logger.warning("Failed to initialize OpenTelemetry: %s", str(e))
 
 
 def main():
@@ -175,6 +255,9 @@ def main():
         logger.warning("coloredlogs not installed, using basic logging")
 
     logger.info("log level: %s", log_level)
+
+    setup_opentelemetry()
+
     cli = EditionCLI()
     sys.exit(cli.run())
 

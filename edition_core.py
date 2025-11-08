@@ -11,8 +11,13 @@ from html.parser import HTMLParser
 from datetime import datetime
 from typing import List, Dict, Optional
 
+from opentelemetry import trace
+
 # Get logger for this module
 logger = logging.getLogger(__name__)
+
+# Get tracer for this module
+tracer = trace.get_tracer(__name__)
 
 
 class Edition:
@@ -92,49 +97,55 @@ class EditionExtractor(HTMLParser):
         if not self.current_edition:
             return
 
-        logger.debug("Parsing edition text with regex patterns")
+        with tracer.start_as_current_span("parse_edition_text") as span:
+            span.set_attribute("text.length", len(text))
+            logger.debug("Parsing edition text with regex patterns")
 
-        # Extract edition number
-        number_match = re.search(r"Nº de Edición\s*:\s*(\S+)", text)
-        if number_match:
-            self.current_edition.number = number_match.group(1).strip()
-            logger.debug("Extracted edition number: %s", self.current_edition.number)
-        else:
-            logger.warning("No edition number found in text")
+            # Extract edition number
+            number_match = re.search(r"Nº de Edición\s*:\s*(\S+)", text)
+            if number_match:
+                self.current_edition.number = number_match.group(1).strip()
+                span.set_attribute("edition.number", self.current_edition.number)
+                logger.debug("Extracted edition number: %s", self.current_edition.number)
+            else:
+                logger.warning("No edition number found in text")
 
-        # Extract edition type
-        type_match = re.search(
-            r"Tipo de Edición\s*:\s*([^\n]+?)(?:\s*Fecha|\s*$)", text, re.DOTALL
-        )
-        if type_match:
-            self.current_edition.type = type_match.group(1).strip()
-            logger.debug("Extracted edition type: %s", self.current_edition.type)
-        else:
-            logger.warning("No edition type found in text")
+            # Extract edition type
+            type_match = re.search(
+                r"Tipo de Edición\s*:\s*([^\n]+?)(?:\s*Fecha|\s*$)", text, re.DOTALL
+            )
+            if type_match:
+                self.current_edition.type = type_match.group(1).strip()
+                span.set_attribute("edition.type", self.current_edition.type)
+                logger.debug("Extracted edition type: %s", self.current_edition.type)
+            else:
+                logger.warning("No edition type found in text")
 
-        # Extract publication date and convert to ISO 8601
-        date_match = re.search(r"Fecha de Publicación\s*:\s*(\d{2}-\d{2}-\d{4})", text)
-        if date_match:
-            date_str = date_match.group(1).strip()
-            logger.debug("Found publication date: %s", date_str)
-            try:
-                # Convert from DD-MM-YYYY to YYYY-MM-DD
-                date_obj = datetime.strptime(date_str, "%d-%m-%Y")
-                self.current_edition.published_date = date_obj.strftime("%Y-%m-%d")
-                logger.debug("Converted to ISO 8601: %s", self.current_edition.published_date)
-            except ValueError:
-                logger.warning("Invalid publication date format: %s", date_str)
-                self.current_edition.published_date = None
-        else:
-            logger.warning("No publication date found in text")
+            # Extract publication date and convert to ISO 8601
+            date_match = re.search(r"Fecha de Publicación\s*:\s*(\d{2}-\d{2}-\d{4})", text)
+            if date_match:
+                date_str = date_match.group(1).strip()
+                logger.debug("Found publication date: %s", date_str)
+                try:
+                    # Convert from DD-MM-YYYY to YYYY-MM-DD
+                    date_obj = datetime.strptime(date_str, "%d-%m-%Y")
+                    self.current_edition.published_date = date_obj.strftime("%Y-%m-%d")
+                    span.set_attribute("edition.published_date", self.current_edition.published_date)
+                    logger.debug("Converted to ISO 8601: %s", self.current_edition.published_date)
+                except ValueError:
+                    logger.warning("Invalid publication date format: %s", date_str)
+                    self.current_edition.published_date = None
+            else:
+                logger.warning("No publication date found in text")
 
-        # Extract administration/government
-        admin_match = re.search(r"Gobierno\s*:\s*([^\n<]+)", text)
-        if admin_match:
-            self.current_edition.administration = admin_match.group(1).strip()
-            logger.debug("Extracted administration: %s", self.current_edition.administration)
-        else:
-            logger.warning("No administration/government found in text")
+            # Extract administration/government
+            admin_match = re.search(r"Gobierno\s*:\s*([^\n<]+)", text)
+            if admin_match:
+                self.current_edition.administration = admin_match.group(1).strip()
+                span.set_attribute("edition.administration", self.current_edition.administration)
+                logger.debug("Extracted administration: %s", self.current_edition.administration)
+            else:
+                logger.warning("No administration/government found in text")
 
     def get_editions(self) -> List[Edition]:
         """Get the list of extracted editions."""
@@ -157,11 +168,22 @@ class EditionExtractionService:
         Returns:
             List of extracted Edition objects
         """
-        logger.debug("Starting HTML parsing (content length: %d chars)", len(html_content))
-        self.extractor.feed(html_content)
-        editions = self.extractor.get_editions()
-        logger.info("Extracted %d editions from HTML", len(editions))
-        return editions
+        with tracer.start_as_current_span("extract_from_html") as span:
+            span.set_attribute("html.content_length", len(html_content))
+            logger.debug("Starting HTML parsing (content length: %d chars)", len(html_content))
+
+            self.extractor.feed(html_content)
+            editions = self.extractor.get_editions()
+
+            span.set_attribute("editions.extracted", len(editions))
+            logger.info("Extracted %d editions from HTML", len(editions))
+
+            # Add event for extraction completion
+            span.add_event("extraction_completed", {
+                "editions_count": len(editions)
+            })
+
+            return editions
 
     def extract_from_file(self, file_path: str) -> List[Edition]:
         """
@@ -177,10 +199,25 @@ class EditionExtractionService:
             FileNotFoundError: If the file doesn't exist
             IOError: If there's an error reading the file
         """
-        logger.debug("Reading HTML file: %s", file_path)
-        with open(file_path, "r", encoding="utf-8") as f:
-            html_content = f.read()
-        logger.debug("Successfully read file (size: %d bytes)", len(html_content))
+        with tracer.start_as_current_span("read_html_file") as span:
+            span.set_attribute("file.path", file_path)
+            logger.debug("Reading HTML file: %s", file_path)
 
-        return self.extract_from_html(html_content)
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    html_content = f.read()
+
+                span.set_attribute("file.size_bytes", len(html_content))
+                logger.debug("Successfully read file (size: %d bytes)", len(html_content))
+
+                return self.extract_from_html(html_content)
+            except FileNotFoundError:
+                span.set_attribute("error", True)
+                span.set_attribute("error.type", "FileNotFoundError")
+                raise
+            except IOError as e:
+                span.set_attribute("error", True)
+                span.set_attribute("error.type", "IOError")
+                span.set_attribute("error.message", str(e))
+                raise
 
