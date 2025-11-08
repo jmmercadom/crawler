@@ -1,3 +1,9 @@
+"""
+Telemetry infrastructure setup.
+
+This module provides OpenTelemetry configuration for distributed tracing.
+"""
+
 import logging
 import os
 
@@ -63,3 +69,4 @@ def setup_opentelemetry() -> None:
         )
     except Exception as e:
         logger.warning("Failed to initialize OpenTelemetry: %s", str(e))
+

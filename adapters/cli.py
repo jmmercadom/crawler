@@ -1,3 +1,9 @@
+"""
+Command-line interface adapter.
+
+This module provides the CLI adapter for the edition extraction application.
+"""
+
 import argparse
 import json
 import logging
@@ -6,7 +12,7 @@ from typing import Optional
 
 from opentelemetry import trace
 
-from edition_core import EditionExtractionService
+from application.services import EditionExtractionService
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -61,7 +67,10 @@ class EditionCLI:
         input_basename = os.path.basename(input_file)
         input_name, _ = os.path.splitext(input_basename)
         output_filename = f"{input_name}-editions.json"
-        output_dir = os.path.join(self.script_dir, "output")
+
+        # Get the project root directory (parent of adapters)
+        project_root = os.path.dirname(self.script_dir)
+        output_dir = os.path.join(project_root, "output")
 
         # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
@@ -96,7 +105,7 @@ class EditionCLI:
         Returns:
             Exit code (0 for success, 1 for error)
         """
-        with tracer.start_as_current_span("extract_editions.run") as span:
+        with tracer.start_as_current_span("cli.run") as span:
             parser = self.setup_argument_parser()
             parsed_args = parser.parse_args(args)
 
@@ -152,3 +161,4 @@ class EditionCLI:
                 span.set_attribute("error.message", str(e))
                 span.set_attribute("exit_code", 1)
                 return 1
+

@@ -1,51 +1,25 @@
 """
-Core domain logic for extracting edition data from HTML.
+Domain logic for extracting edition data from HTML.
 
-This module contains the business logic for parsing and extracting
-edition information from Gaceta Oficial HTML files.
+This module contains the core business logic for parsing HTML and extracting
+edition information.
 """
 
 import re
 import logging
 from html.parser import HTMLParser
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Optional
 
 from opentelemetry import trace
+
+from domain.models import Edition
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
 # Get tracer for this module
 tracer = trace.get_tracer(__name__)
-
-
-class Edition:
-    """Domain model representing a Gaceta Oficial edition."""
-
-    def __init__(
-        self,
-        number: Optional[str] = None,
-        type: Optional[str] = None,
-        published_date: Optional[str] = None,
-        administration: Optional[str] = None,
-    ):
-        self.number = number
-        self.type = type
-        self.published_date = published_date
-        self.administration = administration
-
-    def to_dict(self) -> Dict[str, Optional[str]]:
-        """Convert to dictionary representation."""
-        return {
-            "number": self.number,
-            "type": self.type,
-            "published_date": self.published_date,
-            "administration": self.administration,
-        }
-
-    def __repr__(self) -> str:
-        return f"Edition(number={self.number}, type={self.type}, date={self.published_date})"
 
 
 class EditionExtractor(HTMLParser):
@@ -150,74 +124,4 @@ class EditionExtractor(HTMLParser):
     def get_editions(self) -> List[Edition]:
         """Get the list of extracted editions."""
         return self.editions
-
-
-class EditionExtractionService:
-    """Service for extracting editions from HTML content."""
-
-    def __init__(self):
-        self.extractor = EditionExtractor()
-
-    def extract_from_html(self, html_content: str) -> List[Edition]:
-        """
-        Extract editions from HTML content.
-
-        Args:
-            html_content: The HTML content to parse
-
-        Returns:
-            List of extracted Edition objects
-        """
-        with tracer.start_as_current_span("extract_from_html") as span:
-            span.set_attribute("html.content_length", len(html_content))
-            logger.debug("Starting HTML parsing (content length: %d chars)", len(html_content))
-
-            self.extractor.feed(html_content)
-            editions = self.extractor.get_editions()
-
-            span.set_attribute("editions.extracted", len(editions))
-            logger.info("Extracted %d editions from HTML", len(editions))
-
-            # Add event for extraction completion
-            span.add_event("extraction_completed", {
-                "editions_count": len(editions)
-            })
-
-            return editions
-
-    def extract_from_file(self, file_path: str) -> List[Edition]:
-        """
-        Extract editions from an HTML file.
-
-        Args:
-            file_path: Path to the HTML file
-
-        Returns:
-            List of extracted Edition objects
-
-        Raises:
-            FileNotFoundError: If the file doesn't exist
-            IOError: If there's an error reading the file
-        """
-        with tracer.start_as_current_span("read_html_file") as span:
-            span.set_attribute("file.path", file_path)
-            logger.debug("Reading HTML file: %s", file_path)
-
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    html_content = f.read()
-
-                span.set_attribute("file.size_bytes", len(html_content))
-                logger.debug("Successfully read file (size: %d bytes)", len(html_content))
-
-                return self.extract_from_html(html_content)
-            except FileNotFoundError:
-                span.set_attribute("error", True)
-                span.set_attribute("error.type", "FileNotFoundError")
-                raise
-            except IOError as e:
-                span.set_attribute("error", True)
-                span.set_attribute("error.type", "IOError")
-                span.set_attribute("error.message", str(e))
-                raise
 

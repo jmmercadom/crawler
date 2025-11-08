@@ -1,3 +1,9 @@
+"""
+Logging infrastructure setup.
+
+This module provides logging configuration for the application.
+"""
+
 import logging
 import os
 
@@ -24,6 +30,7 @@ def get_log_level() -> int:
 
 
 def setup_logger():
+    """Configure and initialize the application logger."""
     # Get log level from environment variable
     log_level = get_log_level()
 
@@ -50,3 +57,4 @@ def setup_logger():
         logger.warning("coloredlogs not installed, using basic logging")
 
     logger.info("log level: %s", log_level)
+
