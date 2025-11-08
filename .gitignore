@@ -18,6 +18,8 @@ uv.lock
 # Ignore coverage
 .coverage
 htmlcov/
+coverage.xml
+junit.xml
 
 # Ignore pytests cache directories
 .pytest_cache/
