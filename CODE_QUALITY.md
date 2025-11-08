@@ -24,6 +24,27 @@ uv sync --extra dev
 ```
 
 ### Usage
+
+#### Option 1: Run All Checks at Once
+
+The easiest way to run all quality checks is with the `check-all` command:
+
+```bash
+# Install all required dependencies (test + dev)
+uv sync --extra test --extra dev
+
+# Run all quality checks (tests, linting, formatting, type checking)
+uv run check-all
+```
+
+This command runs:
+- **Tests with coverage**: `uv run pytest --cov`
+- **Linting**: `uv run ruff check .`
+- **Formatting verification**: `uv run ruff format --check .`
+- **Type checking**: `uv run mypy .`
+
+#### Option 2: Run Checks Individually
+
 ```bash
 # Format all Python files
 uv run ruff format .

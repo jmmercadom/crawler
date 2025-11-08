@@ -70,6 +70,26 @@ uv run pytest -m integration # Integration tests only
 uv run pytest -m e2e         # End-to-end tests only
 ```
 
+### Run All Quality Checks
+
+For a comprehensive check of the entire codebase, use the `check-all` command:
+
+```bash
+# Install all required dependencies (test + dev)
+uv sync --extra test --extra dev
+
+# Run all quality checks (tests, linting, formatting, type checking)
+uv run check-all
+```
+
+This command runs:
+- **Tests with coverage**: `uv run pytest --cov`
+- **Linting**: `uv run ruff check .`
+- **Formatting verification**: `uv run ruff format --check .`
+- **Type checking**: `uv run mypy .`
+
+The `check-all` command provides clear feedback for each check and will exit with an error code if any check fails.
+
 ## Development
 
 ### Code Quality
