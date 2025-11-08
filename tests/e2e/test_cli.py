@@ -83,7 +83,6 @@ class TestEditionCLI:
         self, tmp_path: Path, fixtures_dir: Path
     ) -> None:
         """Test complete extraction workflow for all fixtures."""
-        cli = EditionCLI()
         fixtures = get_all_fixtures(fixtures_dir)
 
         for fixture_name in fixtures:
@@ -104,6 +103,7 @@ class TestEditionCLI:
 
             # Run extraction
             output_file = tmp_path / f"{fixture_name}.output.json"
+            cli = EditionCLI()
             exit_code = cli.run(
                 ["--input-file", str(html_file), "--output-file", str(output_file)]
             )
