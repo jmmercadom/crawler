@@ -44,7 +44,7 @@ jobs:
       uses: codecov/codecov-action@v5
       with:
         fail_ci_if_error: true
-        disable-search: true
+        disable_search: true
         files: ./coverage.xml
         name: codecov-umbrella
         flags: ${{ matrix.python-version }}
@@ -55,7 +55,7 @@ jobs:
       uses: codecov/test-results-action@v1
       with:
         fail_ci_if_error: true
-        disable-search: true
+        disable_search: true
         files: ./junit.xml
         name: codecov-umbrella
         flags: ${{ matrix.python-version }}
