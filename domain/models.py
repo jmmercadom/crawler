@@ -33,4 +33,3 @@ class Edition:
 
     def __repr__(self) -> str:
         return f"Edition(number={self.number}, type={self.type}, date={self.published_date})"
-

@@ -12,7 +12,7 @@ from infrastructure.logging import setup_logger
 from infrastructure.telemetry import setup_opentelemetry
 
 
-def main():
+def main() -> None:
     """Main entry point for the CLI."""
     # Setup infrastructure
     setup_logger()
@@ -25,4 +25,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

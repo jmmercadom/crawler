@@ -22,7 +22,7 @@ tracer = trace.get_tracer(__name__)
 class EditionExtractionService:
     """Service for extracting editions from HTML content."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.extractor = EditionExtractor()
 
     def extract_from_html(self, html_content: str) -> List[Edition]:
@@ -37,7 +37,9 @@ class EditionExtractionService:
         """
         with tracer.start_as_current_span("extract_from_html") as span:
             span.set_attribute("html.content_length", len(html_content))
-            logger.debug("Starting HTML parsing (content length: %d chars)", len(html_content))
+            logger.debug(
+                "Starting HTML parsing (content length: %d chars)", len(html_content)
+            )
 
             self.extractor.feed(html_content)
             editions = self.extractor.get_editions()
@@ -46,9 +48,7 @@ class EditionExtractionService:
             logger.info("Extracted %d editions from HTML", len(editions))
 
             # Add event for extraction completion
-            span.add_event("extraction_completed", {
-                "editions_count": len(editions)
-            })
+            span.add_event("extraction_completed", {"editions_count": len(editions)})
 
             return editions
 
@@ -75,7 +75,9 @@ class EditionExtractionService:
                     html_content = f.read()
 
                 span.set_attribute("file.size_bytes", len(html_content))
-                logger.debug("Successfully read file (size: %d bytes)", len(html_content))
+                logger.debug(
+                    "Successfully read file (size: %d bytes)", len(html_content)
+                )
 
                 return self.extract_from_html(html_content)
             except FileNotFoundError:
@@ -87,4 +89,3 @@ class EditionExtractionService:
                 span.set_attribute("error.type", "IOError")
                 span.set_attribute("error.message", str(e))
                 raise
-

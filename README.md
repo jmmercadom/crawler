@@ -11,7 +11,7 @@ uv sync
 ## Usage
 
 ```bash
-python main.py -in samples/index-2025-11-07.html
+uv run python main.py -in samples/index-2025-11-07.html
 ```
 
 Options:
@@ -46,3 +46,48 @@ For setup instructions and advanced configuration, see [OPENTELEMETRY.md](OPENTE
   }
 ]
 ```
+
+## Testing
+
+The project includes comprehensive tests covering unit, integration, and end-to-end scenarios. For detailed testing information, see [TESTING.md](TESTING.md).
+
+Quick test commands:
+```bash
+# Install test dependencies
+uv sync --extra test
+
+# Run all tests
+uv run pytest
+
+# Run with coverage
+uv run pytest --cov --cov-report=html
+
+# Run specific test types
+uv run pytest -m unit        # Unit tests only
+uv run pytest -m integration # Integration tests only
+uv run pytest -m e2e         # End-to-end tests only
+```
+
+## Development
+
+### Code Quality
+This project uses tools to maintain code consistency and catch issues early:
+
+```bash
+# Install development dependencies
+uv sync --extra dev
+
+# Format code (Ruff provides both linting and formatting)
+uv run ruff format .
+
+# Lint code
+uv run ruff check .
+
+# Fix auto-fixable linting issues
+uv run ruff check --fix .
+
+# Type check
+uv run mypy .
+```
+
+For detailed code quality setup and configuration, see [CODE_QUALITY.md](CODE_QUALITY.md).

@@ -25,7 +25,7 @@ tracer = trace.get_tracer(__name__)
 class EditionExtractor(HTMLParser):
     """Extract edition information from HTML."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.editions: List[Edition] = []
         self.current_edition: Optional[Edition] = None
@@ -80,7 +80,9 @@ class EditionExtractor(HTMLParser):
             if number_match:
                 self.current_edition.number = number_match.group(1).strip()
                 span.set_attribute("edition.number", self.current_edition.number)
-                logger.debug("Extracted edition number: %s", self.current_edition.number)
+                logger.debug(
+                    "Extracted edition number: %s", self.current_edition.number
+                )
             else:
                 logger.warning("No edition number found in text")
 
@@ -96,7 +98,9 @@ class EditionExtractor(HTMLParser):
                 logger.warning("No edition type found in text")
 
             # Extract publication date and convert to ISO 8601
-            date_match = re.search(r"Fecha de Publicación\s*:\s*(\d{2}-\d{2}-\d{4})", text)
+            date_match = re.search(
+                r"Fecha de Publicación\s*:\s*(\d{2}-\d{2}-\d{4})", text
+            )
             if date_match:
                 date_str = date_match.group(1).strip()
                 logger.debug("Found publication date: %s", date_str)
@@ -104,8 +108,12 @@ class EditionExtractor(HTMLParser):
                     # Convert from DD-MM-YYYY to YYYY-MM-DD
                     date_obj = datetime.strptime(date_str, "%d-%m-%Y")
                     self.current_edition.published_date = date_obj.strftime("%Y-%m-%d")
-                    span.set_attribute("edition.published_date", self.current_edition.published_date)
-                    logger.debug("Converted to ISO 8601: %s", self.current_edition.published_date)
+                    span.set_attribute(
+                        "edition.published_date", self.current_edition.published_date
+                    )
+                    logger.debug(
+                        "Converted to ISO 8601: %s", self.current_edition.published_date
+                    )
                 except ValueError:
                     logger.warning("Invalid publication date format: %s", date_str)
                     self.current_edition.published_date = None
@@ -116,12 +124,15 @@ class EditionExtractor(HTMLParser):
             admin_match = re.search(r"Gobierno\s*:\s*([^\n<]+)", text)
             if admin_match:
                 self.current_edition.administration = admin_match.group(1).strip()
-                span.set_attribute("edition.administration", self.current_edition.administration)
-                logger.debug("Extracted administration: %s", self.current_edition.administration)
+                span.set_attribute(
+                    "edition.administration", self.current_edition.administration
+                )
+                logger.debug(
+                    "Extracted administration: %s", self.current_edition.administration
+                )
             else:
                 logger.warning("No administration/government found in text")
 
     def get_editions(self) -> List[Edition]:
         """Get the list of extracted editions."""
         return self.editions
-

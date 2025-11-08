@@ -29,14 +29,14 @@ def get_log_level() -> int:
     return level_map.get(level_name, logging.INFO)
 
 
-def setup_logger():
+def setup_logger() -> None:
     """Configure and initialize the application logger."""
     # Get log level from environment variable
     log_level = get_log_level()
 
     # Setup colored logging
     try:
-        import coloredlogs
+        import coloredlogs  # type: ignore
 
         coloredlogs.install(
             level=log_level,
@@ -57,4 +57,3 @@ def setup_logger():
         logger.warning("coloredlogs not installed, using basic logging")
 
     logger.info("log level: %s", log_level)
-

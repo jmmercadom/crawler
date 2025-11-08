@@ -8,11 +8,12 @@ import argparse
 import json
 import logging
 import os
-from typing import Optional
+from typing import List, Optional
 
 from opentelemetry import trace
 
 from application.services import EditionExtractionService
+from domain.models import Edition
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ tracer = trace.get_tracer(__name__)
 class EditionCLI:
     """Command-line interface for edition extraction."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.service = EditionExtractionService()
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -80,7 +81,7 @@ class EditionCLI:
         logger.debug("Resolved output path: %s", output_path)
         return output_path
 
-    def save_editions_to_json(self, editions, output_path: str) -> None:
+    def save_editions_to_json(self, editions: List[Edition], output_path: str) -> None:
         """
         Save editions to a JSON file.
 
@@ -95,7 +96,7 @@ class EditionCLI:
             json.dump(editions_data, f, ensure_ascii=False, indent=2)
         logger.debug("Successfully wrote JSON file")
 
-    def run(self, args=None) -> int:
+    def run(self, args: Optional[List[str]] = None) -> int:
         """
         Run the CLI application.
 
@@ -161,4 +162,3 @@ class EditionCLI:
                 span.set_attribute("error.message", str(e))
                 span.set_attribute("exit_code", 1)
                 return 1
-

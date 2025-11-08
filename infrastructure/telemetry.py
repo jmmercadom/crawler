@@ -69,4 +69,3 @@ def setup_opentelemetry() -> None:
         )
     except Exception as e:
         logger.warning("Failed to initialize OpenTelemetry: %s", str(e))
-

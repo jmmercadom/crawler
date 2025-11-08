@@ -14,3 +14,16 @@ __pycache__/
 # uv
 .uv/
 uv.lock
+
+# Ignore coverage
+.coverage
+htmlcov/
+
+# Ignore pytests cache directories
+.pytest_cache/
+
+# Ignore mypy directory
+.mypy_cache/
+
+# Ignore egg-info directory
+gaceta_oficial_crawler.egg-info/
