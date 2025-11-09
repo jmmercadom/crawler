@@ -27,5 +27,8 @@ junit.xml
 # Ignore mypy directory
 .mypy_cache/
 
+# Ignore ruff cache
+.ruff_cache/
+
 # Ignore egg-info directory
 gaceta_oficial_crawler.egg-info/
