@@ -64,12 +64,12 @@ jobs:
 
     - name: Run type checking
       run: |
-        mypy domain/ application/ adapters/ --ignore-missing-imports
+        mypy .
 
     - name: Run linting
       run: |
-        ruff check domain/ application/ adapters/
+        ruff check .
 
     - name: Run formatting check
       run: |
-        ruff format --check domain/ application/ adapters/
+        ruff format --check .
