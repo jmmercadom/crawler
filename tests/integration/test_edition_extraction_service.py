@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from application.services import EditionExtractionService
+from application.edition_extraction_service import EditionExtractionService
 from domain.models import Edition
 
 

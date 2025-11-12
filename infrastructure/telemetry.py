@@ -69,3 +69,8 @@ def setup_opentelemetry() -> None:
         )
     except Exception as e:
         logger.warning("Failed to initialize OpenTelemetry: %s", str(e))
+
+
+def get_tracer():  # type: ignore
+    """Get configured OpenTelemetry tracer"""
+    return trace.get_tracer(__name__)

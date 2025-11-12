@@ -7,13 +7,15 @@ name = "gaceta-oficial-crawler"
 version = "0.1.0"
 description = "Extract edition data from Gaceta Oficial HTML index files and output as JSON"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "coloredlogs>=15.0.1",
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
     "opentelemetry-instrumentation-logging>=0.41b0",
+    "beautifulsoup4>=4.14.2",
+    "pydeps>=3.0.1",
 ]
 
 [project.optional-dependencies]
@@ -43,7 +45,15 @@ markers = [
 
 [tool.coverage.run]
 source = ["domain", "application", "adapters"]
-omit = ["*/tests/*", "*/test_*"]
+omit = [
+    "*/__init__.py",
+    "*/test_*",
+    "*/tests/*",
+    "adapters/main_cli.py",
+    "infrastructure/*",
+    "main.py",
+    "scripts/*",
+]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -63,7 +73,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -77,5 +87,12 @@ warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 
+[dependency-groups]
+dev = [
+    "lxml>=6.0.2",
+    "types-requests>=2.32.4.20250913",
+]
+
 [project.scripts]
 check-all = "scripts.check_all:main"
+gaceta = "adapters.main_cli:main"

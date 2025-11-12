@@ -20,6 +20,7 @@ uv.lock
 htmlcov/
 coverage.xml
 junit.xml
+lcov.info
 
 # Ignore pytests cache directories
 .pytest_cache/
@@ -32,3 +33,6 @@ junit.xml
 
 # Ignore egg-info directory
 gaceta_oficial_crawler.egg-info/
+
+# Ignore executions folder
+executions/

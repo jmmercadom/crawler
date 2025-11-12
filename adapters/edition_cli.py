@@ -12,7 +12,7 @@ from typing import List, Optional
 
 from opentelemetry import trace
 
-from application.services import EditionExtractionService
+from application.edition_extraction_service import EditionExtractionService
 from domain.models import Edition
 
 # Get logger for this module
@@ -22,32 +22,34 @@ logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
+def setup_argument_parser() -> argparse.ArgumentParser:
+    """Configure and return the argument parser."""
+    parser = argparse.ArgumentParser(
+        description="Extract edition data from Gaceta Oficial HTML index."
+    )
+    parser.add_argument(
+        "-in",
+        "--input-file",
+        dest="input_file",
+        help="Path to the input HTML file, relative to the script's directory",
+        required=True,
+    )
+    parser.add_argument(
+        "-out",
+        "--output-file",
+        dest="output_file",
+        help="Path to the output JSON file (default: output/<input_filename>-editions.json)",
+    )
+    return parser
+
+
 class EditionCLI:
     """Command-line interface for edition extraction."""
 
     def __init__(self) -> None:
+        self.parser = setup_argument_parser()
         self.service = EditionExtractionService()
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    def setup_argument_parser(self) -> argparse.ArgumentParser:
-        """Configure and return the argument parser."""
-        parser = argparse.ArgumentParser(
-            description="Extract edition data from Gaceta Oficial HTML index."
-        )
-        parser.add_argument(
-            "-in",
-            "--input-file",
-            dest="input_file",
-            help="Path to the input HTML file, relative to the script's directory",
-            required=True,
-        )
-        parser.add_argument(
-            "-out",
-            "--output-file",
-            dest="output_file",
-            help="Path to the output JSON file (default: output/<input_filename>-editions.json)",
-        )
-        return parser
 
     def resolve_output_path(self, input_file: str, output_file: Optional[str]) -> str:
         """
@@ -107,8 +109,7 @@ class EditionCLI:
             Exit code (0 for success, 1 for error)
         """
         with tracer.start_as_current_span("cli.run") as span:
-            parser = self.setup_argument_parser()
-            parsed_args = parser.parse_args(args)
+            parsed_args = self.parser.parse_args(args)
 
             logger.debug(
                 "CLI arguments: input_file=%s, output_file=%s",

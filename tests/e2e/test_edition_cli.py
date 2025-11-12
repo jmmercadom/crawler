@@ -3,7 +3,7 @@ import pytest
 import json
 
 from unittest.mock import patch
-from adapters.cli import EditionCLI
+from adapters.edition_cli import EditionCLI
 from tests.helpers.fixtures import (
     load_html_fixture,
     load_expected_json,
@@ -24,7 +24,7 @@ class TestEditionCLI:
     def test_setup_argument_parser(self) -> None:
         """Test argument parser setup."""
         cli = EditionCLI()
-        parser = cli.setup_argument_parser()
+        parser = cli.parser
 
         # Test required arguments
         with pytest.raises(SystemExit):
