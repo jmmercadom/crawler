@@ -113,8 +113,8 @@ class ExecutionCLI:
                 execution.status.value,
                 execution.change_detected,
                 execution.change_type.value if execution.change_type else None,
-                execution.content_size,
-                execution.download_duration_ms,
+                execution.content_size if execution.content_size else 0,
+                execution.download_duration_ms if execution.download_duration_ms else 0,
             )
 
             logger.info(f"Execution ID: {execution.execution_id}")
