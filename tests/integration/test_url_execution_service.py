@@ -187,3 +187,339 @@ def test_execute_url_error_handling(
 
     mock_storage.save_execution.assert_not_called()
     mock_storage.save_content.assert_not_called()
+
+
+@pytest.mark.integration
+@patch("application.url_execution_service.get_tracer", return_value=DummyTracer())
+class TestNormalizedHashScenarios:
+    """Test scenarios for normalized hash comparison when ETag is not available."""
+
+    def test_first_download_no_etag(
+        self,
+        dummy_tracer: DummyTracer,
+        mock_http_client: MagicMock,
+        mock_storage: MagicMock,
+        mock_normalizer: MagicMock,
+    ) -> None:
+        """Test first download when no ETag is available."""
+        mock_storage.load_last_execution.return_value = None
+        mock_http_client.head.return_value = (None, {})
+        mock_http_client.get.return_value = (None, "<html>content</html>", 200)
+
+        service = URLExecutionService(
+            http_client=mock_http_client,
+            storage=mock_storage,
+            normalizer=mock_normalizer,
+        )
+
+        record = service.execute_url("https://example.com")
+
+        assert record.status == ExecutionStatus.COMPLETED
+        assert record.change_detected is True
+        assert record.change_type == ChangeType.NEW_CONTENT
+        assert record.etag is None
+
+        mock_http_client.get.assert_called_once()
+        mock_storage.save_execution.assert_called_once()
+        mock_storage.save_content.assert_called_once()
+
+    def test_skip_due_to_normalized_hash_match(
+        self,
+        dummy_tracer: DummyTracer,
+        mock_http_client: MagicMock,
+        mock_storage: MagicMock,
+        mock_normalizer: MagicMock,
+    ) -> None:
+        """Test skipping when normalized hash matches (no ETag)."""
+        previous = ExecutionRecord(
+            url="https://example.com",
+            execution_id="prev-id",
+            timestamp=datetime(2025, 1, 1, 0, 0, 0),
+            status=ExecutionStatus.COMPLETED,
+            etag=None,
+            content_hash="different-hash",  # Raw content changed
+            normalized_hash="c3d4e5f6789012345678901234abcdef",  # Valid MD5 hash
+        )
+        mock_storage.load_last_execution.return_value = previous
+        mock_http_client.head.return_value = (None, {})
+        mock_http_client.get.return_value = (
+            None,
+            "<html>content + visitor stats</html>",
+            200,
+        )
+        mock_normalizer.normalize.return_value = (
+            "<html>content</html>"  # Same normalized content
+        )
+
+        service = URLExecutionService(
+            http_client=mock_http_client,
+            storage=mock_storage,
+            normalizer=mock_normalizer,
+        )
+
+        # Mock the hash generation to return the same normalized hash
+        with patch.object(service, "_generate_hashes") as mock_generate:
+            mock_generate.return_value = (
+                "new-content-hash",  # Different content hash
+                "<html>content</html>",  # Same normalized content
+                "c3d4e5f6789012345678901234abcdef",  # Same normalized hash
+            )
+
+            record = service.execute_url("https://example.com")
+
+        assert record.status == ExecutionStatus.SKIPPED
+        assert record.change_detected is False
+
+        mock_http_client.get.assert_called_once()  # Called for comparison
+        mock_storage.save_execution.assert_not_called()
+        mock_storage.save_content.assert_not_called()
+
+    def test_download_when_normalized_hash_changed(
+        self,
+        dummy_tracer: DummyTracer,
+        mock_http_client: MagicMock,
+        mock_storage: MagicMock,
+        mock_normalizer: MagicMock,
+    ) -> None:
+        """Test downloading when normalized hash has changed (no ETag)."""
+        previous = ExecutionRecord(
+            url="https://example.com",
+            execution_id="prev-id",
+            timestamp=datetime(2025, 1, 1, 0, 0, 0),
+            status=ExecutionStatus.COMPLETED,
+            etag=None,
+            content_hash="hash1",
+            normalized_hash="a1b2c3d4e5f6789012345678901234ab",  # Valid MD5 hash
+        )
+        mock_storage.load_last_execution.return_value = previous
+        mock_http_client.head.return_value = (None, {})
+        mock_http_client.get.return_value = (None, "<html>new content</html>", 200)
+        mock_normalizer.normalize.return_value = "<html>new normalized content</html>"
+
+        service = URLExecutionService(
+            http_client=mock_http_client,
+            storage=mock_storage,
+            normalizer=mock_normalizer,
+        )
+
+        record = service.execute_url("https://example.com")
+
+        assert record.status == ExecutionStatus.COMPLETED
+        assert record.change_detected is True
+        assert record.change_type == ChangeType.NORMALIZED_HASH_CHANGED
+
+        mock_http_client.get.assert_called_once()
+        mock_storage.save_execution.assert_called_once()
+        mock_storage.save_content.assert_called_once()
+
+    def test_download_when_only_raw_content_changed(
+        self,
+        dummy_tracer: DummyTracer,
+        mock_http_client: MagicMock,
+        mock_storage: MagicMock,
+        mock_normalizer: MagicMock,
+    ) -> None:
+        """Test downloading when only raw content changed but normalized is same."""
+        previous = ExecutionRecord(
+            url="https://example.com",
+            execution_id="prev-id",
+            timestamp=datetime(2025, 1, 1, 0, 0, 0),
+            status=ExecutionStatus.COMPLETED,
+            etag=None,
+            content_hash="hash1",
+            normalized_hash="b2c3d4e5f6789012345678901234abcd",  # Valid MD5 hash
+        )
+        mock_storage.load_last_execution.return_value = previous
+        mock_http_client.head.return_value = (None, {})
+        mock_http_client.get.return_value = (
+            None,
+            "<html>content + visitor stats</html>",
+            200,
+        )
+        mock_normalizer.normalize.return_value = (
+            "<html>content</html>"  # Same normalized
+        )
+
+        service = URLExecutionService(
+            http_client=mock_http_client,
+            storage=mock_storage,
+            normalizer=mock_normalizer,
+        )
+
+        record = service.execute_url("https://example.com")
+
+        assert record.status == ExecutionStatus.COMPLETED
+        assert record.change_detected is True
+        assert record.change_type == ChangeType.NORMALIZED_HASH_CHANGED
+
+        mock_http_client.get.assert_called_once()
+        mock_storage.save_execution.assert_called_once()
+        mock_storage.save_content.assert_called_once()
+
+
+@pytest.mark.integration
+@patch("application.url_execution_service.get_tracer", return_value=DummyTracer())
+class TestErrorHandlingScenarios:
+    """Test error handling scenarios for the enhanced service."""
+
+    def test_network_error_during_normalized_comparison(
+        self,
+        dummy_tracer: DummyTracer,
+        mock_http_client: MagicMock,
+        mock_storage: MagicMock,
+        mock_normalizer: MagicMock,
+    ) -> None:
+        """Test handling network errors during normalized hash comparison."""
+        previous = ExecutionRecord(
+            url="https://example.com",
+            execution_id="prev-id",
+            timestamp=datetime(2025, 1, 1, 0, 0, 0),
+            status=ExecutionStatus.COMPLETED,
+            etag=None,
+            content_hash="hash1",
+            normalized_hash="f4g5h6i789012345678901234bcde",  # Valid MD5 hash
+        )
+        mock_storage.load_last_execution.return_value = previous
+        mock_http_client.head.return_value = (None, {})
+        mock_http_client.get.side_effect = Exception("Network error")
+
+        service = URLExecutionService(
+            http_client=mock_http_client,
+            storage=mock_storage,
+            normalizer=mock_normalizer,
+        )
+
+        record = service.execute_url("https://example.com")
+
+        assert record.status == ExecutionStatus.FAILED
+        assert record.error_message is not None
+        assert "Network error" in record.error_message
+
+        mock_storage.save_execution.assert_not_called()
+        mock_storage.save_content.assert_not_called()
+
+    def test_missing_normalized_hash_in_previous_execution(
+        self,
+        dummy_tracer: DummyTracer,
+        mock_http_client: MagicMock,
+        mock_storage: MagicMock,
+        mock_normalizer: MagicMock,
+    ) -> None:
+        """Test when previous execution has no normalized hash."""
+        previous = ExecutionRecord(
+            url="https://example.com",
+            execution_id="prev-id",
+            timestamp=datetime(2025, 1, 1, 0, 0, 0),
+            status=ExecutionStatus.COMPLETED,
+            etag=None,
+            content_hash="hash1",
+            normalized_hash=None,  # Missing normalized hash
+        )
+        mock_storage.load_last_execution.return_value = previous
+        mock_http_client.head.return_value = (None, {})
+        mock_http_client.get.return_value = (None, "<html>content</html>", 200)
+
+        service = URLExecutionService(
+            http_client=mock_http_client,
+            storage=mock_storage,
+            normalizer=mock_normalizer,
+        )
+
+        record = service.execute_url("https://example.com")
+
+        assert record.status == ExecutionStatus.COMPLETED
+        assert record.change_detected is True
+        assert record.change_type == ChangeType.CONTENT_HASH_CHANGED
+
+        mock_http_client.get.assert_called_once()
+        mock_storage.save_execution.assert_called_once()
+        mock_storage.save_content.assert_called_once()
+
+
+@pytest.mark.integration
+@patch("application.url_execution_service.get_tracer", return_value=DummyTracer())
+class TestETagEnhancedScenarios:
+    """Test enhanced ETag scenarios with the new logic."""
+
+    def test_download_when_etag_changed(
+        self,
+        dummy_tracer: DummyTracer,
+        mock_http_client: MagicMock,
+        mock_storage: MagicMock,
+        mock_normalizer: MagicMock,
+    ) -> None:
+        """Test downloading when ETag has changed."""
+        previous = ExecutionRecord(
+            url="https://example.com",
+            execution_id="prev-id",
+            timestamp=datetime(2025, 1, 1, 0, 0, 0),
+            status=ExecutionStatus.COMPLETED,
+            etag="etag-123",
+            content_hash="hash1",
+            normalized_hash="norm1",
+        )
+        mock_storage.load_last_execution.return_value = previous
+        mock_http_client.head.return_value = ("etag-456", {})
+        mock_http_client.get.return_value = (
+            "etag-456",
+            "<html>new content</html>",
+            200,
+        )
+
+        service = URLExecutionService(
+            http_client=mock_http_client,
+            storage=mock_storage,
+            normalizer=mock_normalizer,
+        )
+
+        record = service.execute_url("https://example.com")
+
+        assert record.status == ExecutionStatus.COMPLETED
+        assert record.change_detected is True
+        assert record.change_type == ChangeType.ETAG_CHANGED
+        assert record.etag == "etag-456"
+
+        mock_http_client.get.assert_called_once()
+        mock_storage.save_execution.assert_called_once()
+        mock_storage.save_content.assert_called_once()
+
+    def test_etag_check_disabled(
+        self,
+        dummy_tracer: DummyTracer,
+        mock_http_client: MagicMock,
+        mock_storage: MagicMock,
+        mock_normalizer: MagicMock,
+    ) -> None:
+        """Test behavior when ETag check is disabled."""
+        previous = ExecutionRecord(
+            url="https://example.com",
+            execution_id="prev-id",
+            timestamp=datetime(2025, 1, 1, 0, 0, 0),
+            status=ExecutionStatus.COMPLETED,
+            etag="etag-123",
+            content_hash="hash1",
+            normalized_hash="norm1",
+        )
+        mock_storage.load_last_execution.return_value = previous
+        mock_http_client.head.return_value = ("etag-123", {})
+        mock_http_client.get.return_value = ("etag-123", "<html>content</html>", 200)
+
+        os.environ["ENABLE_ETAG_CHECK"] = "false"
+
+        service = URLExecutionService(
+            http_client=mock_http_client,
+            storage=mock_storage,
+            normalizer=mock_normalizer,
+        )
+
+        record = service.execute_url("https://example.com")
+
+        assert record.status == ExecutionStatus.COMPLETED
+        assert record.change_detected is False
+
+        mock_http_client.get.assert_called_once()
+        mock_storage.save_execution.assert_called_once()
+        mock_storage.save_content.assert_called_once()
+
+        # Reset for other tests
+        os.environ["ENABLE_ETAG_CHECK"] = "true"

@@ -1,6 +1,6 @@
 import requests
 import time
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, Any
 from requests.exceptions import RequestException, Timeout, ConnectionError
 from domain.execution_models import ExecutionStatus
 from infrastructure.telemetry import get_tracer
@@ -17,17 +17,17 @@ class HTTPClientAdapter:
         base_wait_time: int = 2,
         user_agent: str = "GacetaCrawler/1.0",
         verify_ssl: bool = True,
-        session: Session = requests.Session(),
-    ):
+        session: Optional[Session] = None,
+    ) -> None:
         self.timeout = timeout
         self.max_retries = max_retries
         self.base_wait_time = base_wait_time
         self.user_agent = user_agent
         self.verify_ssl = verify_ssl
-        self.session = session
+        self.session = session if session is not None else requests.Session()
         self.headers = {"User-Agent": user_agent}
 
-    def head(self, url: str) -> Tuple[Optional[str], Dict[str, str]]:
+    def head(self, url: str) -> Tuple[Optional[str], Dict[str, Any]]:
         """
         Perform HTTP HEAD request and return ETag and headers.
 
@@ -50,15 +50,16 @@ class HTTPClientAdapter:
                     return (etag, dict(response.headers))
                 except (RequestException, ConnectionError, Timeout) as e:
                     if attempt < self.max_retries:
-                        if self.base_wait_time == 0:
-                            wait_time = 0
-                        else:
-                            wait_time = self.base_wait_time**attempt
+                        wait_time = (
+                            0
+                            if self.base_wait_time == 0
+                            else self.base_wait_time**attempt
+                        )
                         time.sleep(wait_time)
                         continue
                     span.set_attribute("error", str(e))
                     raise
-        return (None, {})  # Added for MyPy compliance
+        return (None, {})  # Fallback for type checking
 
     def get(self, url: str) -> Tuple[Optional[str], str, int]:
         """
@@ -92,10 +93,11 @@ class HTTPClientAdapter:
                     return (etag, content, status_code)
                 except (RequestException, ConnectionError, Timeout) as e:
                     if attempt < self.max_retries:
-                        if self.base_wait_time == 0:
-                            wait_time = 0
-                        else:
-                            wait_time = self.base_wait_time**attempt
+                        wait_time = (
+                            0
+                            if self.base_wait_time == 0
+                            else self.base_wait_time**attempt
+                        )
                         time.sleep(wait_time)
                         continue
                     span.set_attributes(
@@ -105,5 +107,5 @@ class HTTPClientAdapter:
                         }
                     )
                     raise
-        # Fallback return to satisfy type checker (unreachable in normal flow)
+        # Unreachable in normal flow; added for type checking
         return (None, "", 0)
