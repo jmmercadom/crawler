@@ -1,0 +1,19 @@
+{
+  "name": "Python Debugger: Attach",
+  "type": "debugpy",
+  "request": "attach",
+  "connect": {
+    "host": "localhost",
+    "port": 5678
+  },
+  "configurations": [
+    {
+      "name": "Python Debugger: main.py",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "main.py",
+      "console": "integratedTerminal",
+      "args": "execute http://www.gacetaoficialdebolivia.gob.bo/edicions/buscarEspeciales/13"
+    }
+  ],
+}
