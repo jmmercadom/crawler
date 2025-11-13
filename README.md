@@ -1,6 +1,7 @@
 # Gaceta Oficial Crawler
 
 [![codecov](https://codecov.io/github/jmmercadom/crawler/graph/badge.svg?token=CIJ6ULTG2N)](https://codecov.io/github/jmmercadom/crawler)
+[![Test Suite](https://github.com/jmmercadom/crawler/actions/workflows/tests.yml/badge.svg)](https://github.com/jmmercadom/crawler/actions/workflows/tests.yml)
 
 Extract edition data from Gaceta Oficial HTML index files and output as JSON.
 
