@@ -6,14 +6,14 @@ This project uses automated tools to maintain code consistency, catch issues ear
 
 ### Ruff (Linter and Formatter)
 - **Purpose**: Provides fast Python linting and code formatting
-- **Version**: 0.14.4+
+- **Version**: 0.14.4 (as specified in pyproject.toml)
 - **Configuration**: Configured in `pyproject.toml` under `[tool.ruff]` and `[tool.ruff.format]`
 - **Note**: Ruff replaces both Black (formatting) and Flake8 (linting) while maintaining compatibility with Black's style
 
 ### MyPy (Type Checker)
 - **Purpose**: Static type checking for Python code
-- **Version**: 1.5.0+
-- **Configuration**: Default settings (can be customized in `pyproject.toml`)
+- **Version**: 1.5.0 (as specified in pyproject.toml)
+- **Configuration**: Configured in `pyproject.toml` under `[tool.mypy]`
 
 ## Setup
 
@@ -43,6 +43,8 @@ This command runs:
 - **Formatting verification**: `uv run ruff format --check .`
 - **Type checking**: `uv run mypy .`
 
+The `check-all` script provides detailed output for each check and will exit with an error code if any check fails.
+
 #### Option 2: Run Checks Individually
 
 ```bash
@@ -53,7 +55,7 @@ uv run ruff format .
 uv run ruff format --check .
 
 # Lint all Python files
-uv run ruff check
+uv run ruff check .
 
 # Fix auto-fixable issues
 uv run ruff check --fix

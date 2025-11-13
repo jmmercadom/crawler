@@ -14,10 +14,14 @@ uv sync
 ## Usage
 
 ```bash
-uv run python main.py -in samples/index-2025-11-07.html
+# Extract editions from HTML file
+uv run gaceta extract -in samples/index-2025-11-07.html
+
+# Execute URL and detect changes
+uv run gaceta execute <url>
 ```
 
-Options:
+### Extract Command Options:
 - `-in` - Input HTML file (required)
 - `-out` - Output JSON file (optional, defaults to `output/<input_filename>-editions.json`)
 

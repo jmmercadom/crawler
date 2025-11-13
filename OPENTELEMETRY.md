@@ -24,14 +24,14 @@ Traces provide visibility into:
 ```bash
 export OTEL_SERVICE_NAME=gaceta-crawler
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-python main.py -in samples/index-2025-11-07.html
+uv run gaceta extract -in samples/index-2025-11-07.html
 ```
 
 ### Running with OpenTelemetry Disabled
 
 ```bash
 export OTEL_TRACES_ENABLED=false
-python main.py -in samples/index-2025-11-07.html
+uv run gaceta extract -in samples/index-2025-11-07.html
 ```
 
 ## Setting up a Trace Collector

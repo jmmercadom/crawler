@@ -84,6 +84,8 @@ This command runs:
 - **Formatting verification**: `uv run ruff format --check .`
 - **Type checking**: `uv run mypy .`
 
+The `check-all` script provides detailed output for each check and will exit with an error code if any check fails.
+
 ### Option 2: Run Checks Individually
 
 ```bash
