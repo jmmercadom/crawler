@@ -74,63 +74,69 @@ class ExecutionCLI:
             span.set_attribute("cli.no_etag_check", parsed_args.no_etag_check)
             span.set_attribute("cli.no_hash_check", parsed_args.no_hash_check)
 
-        # Configure logging
-        logging_level = logging.DEBUG if parsed_args.verbose else logging.INFO
-        logging.basicConfig(
-            level=logging_level,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        )
-
-        try:
-            # Set environment flags based on CLI options
-            if parsed_args.no_etag_check:
-                os.environ["ENABLE_ETAG_CHECK"] = "false"
-            if parsed_args.no_hash_check:
-                os.environ["ENABLE_CONTENT_HASH_CHECK"] = "false"
-                os.environ["ENABLE_NORMALIZED_HASH_CHECK"] = "false"
-
-            # Execute URL
-            execution = self.service.execute_url(parsed_args.url)
-
-            # Output results
-            # Record execution details in span and logs
-            span.set_attribute("execution.id", execution.execution_id)
-            span.set_attribute("execution.status", execution.status.value)
-            span.set_attribute("execution.change_detected", execution.change_detected)
-            if execution.change_type:
-                span.set_attribute("execution.change_type", execution.change_type.value)
-            span.set_attribute("execution.content_size", execution.content_size)
-            span.set_attribute(
-                "execution.download_duration_ms",
-                execution.download_duration_ms
-                if execution.download_duration_ms is not None
-                else 0,
+            # Configure logging
+            logging_level = logging.DEBUG if parsed_args.verbose else logging.INFO
+            logging.basicConfig(
+                level=logging_level,
+                format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             )
 
-            logger.debug(
-                "Execution result: id=%s, status=%s, change=%s, type=%s, size=%d, duration=%dms",
-                execution.execution_id,
-                execution.status.value,
-                execution.change_detected,
-                execution.change_type.value if execution.change_type else None,
-                execution.content_size if execution.content_size else 0,
-                execution.download_duration_ms if execution.download_duration_ms else 0,
-            )
+            try:
+                # Set environment flags based on CLI options
+                if parsed_args.no_etag_check:
+                    os.environ["ENABLE_ETAG_CHECK"] = "false"
+                if parsed_args.no_hash_check:
+                    os.environ["ENABLE_CONTENT_HASH_CHECK"] = "false"
+                    os.environ["ENABLE_NORMALIZED_HASH_CHECK"] = "false"
 
-            logger.info(f"Execution ID: {execution.execution_id}")
-            logger.info(f"Status: {execution.status.value}")
-            logger.info(f"Change detected: {execution.change_detected}")
-            if execution.change_type:
-                logger.info(f"Change type: {execution.change_type.value}")
-            logger.info(f"Content size: {execution.content_size} bytes")
-            logger.info(f"Download duration: {execution.download_duration_ms} ms")
+                # Execute URL
+                execution = self.service.execute_url(parsed_args.url)
 
-            return 0
+                # Output results
+                # Record execution details in span and logs
+                span.set_attribute("execution.id", execution.execution_id)
+                span.set_attribute("execution.status", execution.status.value)
+                span.set_attribute(
+                    "execution.change_detected", execution.change_detected
+                )
+                if execution.change_type:
+                    span.set_attribute(
+                        "execution.change_type", execution.change_type.value
+                    )
+                span.set_attribute("execution.content_size", execution.content_size)
+                span.set_attribute(
+                    "execution.download_duration_ms",
+                    execution.download_duration_ms
+                    if execution.download_duration_ms is not None
+                    else 0,
+                )
 
-        except Exception as e:
-            logging.error(f"Execution failed: {str(e)}")
-            span.set_attribute("error.type", type(e).__name__)
-            span.set_attribute("error.message", str(e))
-            span.set_attribute("success", False)
-            span.set_attribute("exit_code", 1)
-            return 1
+                logger.debug(
+                    "Execution result: id=%s, status=%s, change=%s, type=%s, size=%d, duration=%dms",
+                    execution.execution_id,
+                    execution.status.value,
+                    execution.change_detected,
+                    execution.change_type.value if execution.change_type else None,
+                    execution.content_size if execution.content_size else 0,
+                    execution.download_duration_ms
+                    if execution.download_duration_ms
+                    else 0,
+                )
+
+                logger.info(f"Execution ID: {execution.execution_id}")
+                logger.info(f"Status: {execution.status.value}")
+                logger.info(f"Change detected: {execution.change_detected}")
+                if execution.change_type:
+                    logger.info(f"Change type: {execution.change_type.value}")
+                logger.info(f"Content size: {execution.content_size} bytes")
+                logger.info(f"Download duration: {execution.download_duration_ms} ms")
+
+                return 0
+
+            except Exception as e:
+                logging.error(f"Execution failed: {str(e)}")
+                span.set_attribute("error.type", type(e).__name__)
+                span.set_attribute("error.message", str(e))
+                span.set_attribute("success", False)
+                span.set_attribute("exit_code", 1)
+                return 1
