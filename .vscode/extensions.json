@@ -4,5 +4,6 @@
     "ms-python.mypy-type-checker",
     "ms-python.python",
     "ms-python.debugpy",
+    "tamasfe.even-better-toml",
   ]
 }
